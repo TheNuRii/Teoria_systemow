@@ -1,0 +1,209 @@
+import sympy 
+import numpy as np
+import scipy.signal
+import matplotlib.pyplot as plt
+from IPython.display import display
+
+#declare symbolic variable 's' and 't'
+s  = sympy.symbols('s', cpmplex = True)
+t  = sympy.symbols('t', real    = True, positive = True)
+#declare transmitation of object
+Ho=1/(s**2+(10+2*X)*s +20)
+#declare regulator
+kd= 5*(10+X)
+kp= 300+20*X
+ki=50+5*X
+PID= [kp, ki, kd]
+#tansmitancja regulatora 
+print("Transmitancja regulatora")
+Hr=sympy.cancel(kp+(ki/s)+(kd*s))
+display(Hr)
+#transmitancja ukladu
+print("Transmitancja ukladu")
+H=sympy.cancel((Hr*Ho)/(1+Hr*Ho))
+display(H)
+#transmitancja uchybowa
+print("Transmitancja uchybowa")
+He=sympy.cancel(1/(1+Hr*Ho))
+display(He)
+#blad statyczny
+err=sympy.limit(He,s, 0)
+print("blad statyczny: ", err)
+
+#odpowiedz skokowa
+def calcStepRespFromSympyH(H, TimeDomain):
+    B,A = sympy.fraction(H.simplify())
+    B = [float(i) for i in sympy.Poly(B, s).all_coeffs()]
+    A = [float(i) for i in sympy.Poly(A, s).all_coeffs()]
+    samples = scipy.signal.step(scipy.signal.tf2ss(B, A), T=TimeDomain)[1]
+    return samples
+time = np.linspace(0, 2, 1000)
+step_resp = calcStepRespFromSympyH(H, time)
+plt.plot(time, step_resp)
+#make pretty plot
+plt.ylabel('H(s)')
+plt.xlabel('Czas')
+plt.grid()
+plt.title('odpowiedz impulsowa')
+plt.show()
+--------------------------------2---------------------------
+s = sympy.Symbol('s', real = 'False', nonzero = 'True')
+R,L,C = sympy.symbols('R, L, C', real = True, positive = True)
+H1=sympy.cancel((1/s*C)/(R+s*L+(1/s*C)))
+display(H1)
+
+# x1=uc   x2=il
+#pochodna x1=ic/c   pochodna x2=ul/l
+
+# wzór ogólny
+a=sympy.Matrix([[0, (1/C)], [(-1/L), (-R/L)]] )
+b=sympy.Matrix([[0], [(1/L)]])
+c=sympy.Matrix([[-1, -R]])
+d=sympy.Matrix([1])
+display(a)
+display(b)
+display(c)
+display(d)
+I=sympy.eye(2)
+
+H=c*(s*I-a).inv()*b+d
+display(sympy.simplify(H))
+
+R,L,C = sympy.symbols('R, L, C', real = True, positive = True)
+a=sympy.Matrix([[0, (1/C)], [(-1/L), (-R/L)]] )
+
+print('Wartości własne:')
+display(a.eigenvals(multiple=True))
+
+# przy R,L,C=1
+R, L, C = 1, 1, 1
+a=sympy.Matrix([[0, (1/C)], [(-1/L), (-R/L)]] )
+print('Wartości własne dla R=L=C=1:')
+display(a.eigenvals(multiple=True))
+print('Bieguny transmitancji R=L=C=1:')
+den = np.poly1d([C*L, C*R, 1])
+print(np.roots(den))
+
+lapunov_stable = all(sympy.re(eig) <= 0 for eig in a.eigenvals(multiple=True))
+if lapunov_stable:
+    print("The system is Lapunov stable.")
+else:
+    print("The system is not Lapunov stable.")
+
+# BIBO Stability Check
+denominator_coefficients = [C*L, C*R, 1]
+roots = np.roots(denominator_coefficients)
+bibo_stable = all(np.real(root) < 0 for root in roots)
+if bibo_stable:
+    print("The system is BIBO stable.")
+else:
+    print("The system is not BIBO stable.")
+    
+------------------------------------3----------------------------
+from scipy.fftpack import fft,ifft
+#u(n) = δ(n-1) + 2* δ(n-2) + 3* δ(n-3) + 2* δ(n-4) + δ(n-5) – delty kronekera
+# n2 = np.array([0,1,2,3,4,5])
+# f2 = np.array([0,1,2,3,2,1])
+
+#sinus
+n1 = np.arange(64)
+f1 = np.sin(2*np.pi*n1/64)
+#Dyskretna Transformata Fouriera
+f2=fft(f1,64)
+Re=np.real(f2)
+Im= np. imag(f2)
+#rekonstrukcja sinusa
+recon_f2 = ifft(f2, 64)
+
+plt.subplot(2,2,1)
+plt.stem(n1, f1)
+plt.title("sinus")
+plt.xlim=2*X+2
+plt.xlabel("n")
+plt.ylabel("sin(n)")
+plt.grid()
+plt.subplot(2,2,2)
+plt.stem(n1, recon_f2)
+plt.title("rekonstrukcja")
+plt.xlim=2*X+2
+plt.xlabel("n")
+plt.ylabel("recon_sin")
+plt.grid()
+plt.subplot(2,2,3)
+plt.stem(n1, Re)
+plt.title("Rzeczywiste")
+plt.xlim=2*X+2
+plt.xlabel("n")
+plt.ylabel("Re")
+plt.grid()
+plt.subplot(2,2,4)
+plt.stem(n1, Im)
+plt.title("Urojone")
+plt.xlim=2*X+2
+plt.xlabel("n")
+plt.ylabel("Im")
+plt.grid()
+
+plt.tight_layout()
+plt.show()
+------------------------4------------------------------------
+#znalezienie minimalnego rzedu dla podanych cosiow
+αp= 3
+αs= 80
+ωp= 3
+ωs= 8 
+
+ord, wn = scipy.signal.buttord(ωp, ωs, αp, αs, analog=True)
+print(ord)
+ord2, wn2 = scipy.signal.cheb1ord(ωp, ωs, αp, αs, analog=True)
+print(ord2)
+ord3, wn3 = scipy.signal.cheb2ord(ωp, ωs, αp, αs, analog=True)
+print(ord3)
+ord4, wn4 = scipy.signal.ellipord(ωp, ωs, αp, αs, analog=True)
+print(ord4)
+
+#butterford
+a_p = 3
+a_s = 40
+w_p = 10
+w_s = 1
+w = np.logspace(-2, 2, 1000)
+N, yyy = scipy.signal.buttord(w_p, w_s, a_p, a_s, analog=True)
+print(N)
+b, a = scipy.signal.butter(N, w_p, 'low', analog=True, output='ba') 
+_, h = scipy.signal.freqs(b, a, w)
+M = abs(h)
+#L = -20*np.log10(M)
+re = np.real(h)
+im = np.imag(h)
+a = np.arctan(im/re)
+
+# plt.subplot(2,1,1)
+# plt.loglog(w, M)
+# plt.subplot(2,1,2)
+# plt.plot(w, a)
+# plt.xlabel("ω")
+# plt.ylabel("|H(jω)|")
+# plt.grid()
+# plt.show()
+#display magnitude characteristic
+plt.subplot(2,1,1)
+plt.loglog(w, M  )
+plt.title("charakterystyka amplitudowa")
+plt.xlabel("ω")
+plt.ylabel("|H(jω)|")
+plt.grid() 
+
+plt.subplot(2,1,2)
+plt.plot(w, a)
+plt.title("charakterystyka fazowa")
+plt.xlabel("ω")
+plt.ylabel("arctan(im/re)")
+plt.grid() 
+plt.tight_layout()
+plt.show()
+# plt.semilogx(w, L  )
+# plt.set_title("charakterystyka tłumienia (n = %d)"%(i))
+# plt.set_xlabel("ω")
+# plt.set_ylabel("-20log10(|H(jω)|)")
+# plt.grid()
